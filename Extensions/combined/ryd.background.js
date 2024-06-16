@@ -6,6 +6,7 @@ let api;
 /** stores extension's global config */
 let extConfig = {
   disableVoteSubmission: false,
+  disableLogging: true,
   coloredThumbs: false,
   coloredBar: false,
   colorTheme: "classic", // classic, accessible, neon
@@ -31,17 +32,12 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.message == "set_state") {
     // chrome.identity.getAuthToken({ interactive: true }, function (token) {
     let token = "";
-    fetch(
-      `${apiUrl}/votes?videoId=${request.videoId}&likeCount=${
-        request.likeCount || ""
-      }`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-      }
-    )
+    fetch(`${apiUrl}/votes?videoId=${request.videoId}&likeCount=${request.likeCount || ""}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+    })
       .then((response) => response.json())
       .then((response) => {
         sendResponse(response);
@@ -146,15 +142,12 @@ async function sendVote(videoId, vote) {
 async function register() {
   const userId = generateUserID();
   api.storage.sync.set({ userId });
-  const registrationResponse = await fetch(
-    `${apiUrl}/puzzle/registration?userId=${userId}`,
-    {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-    }
-  ).then((response) => response.json());
+  const registrationResponse = await fetch(`${apiUrl}/puzzle/registration?userId=${userId}`, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+  }).then((response) => response.json());
   const solvedPuzzle = await solvePuzzle(registrationResponse);
   if (!solvedPuzzle.solution) {
     await register();
@@ -209,9 +202,7 @@ function countLeadingZeroes(uInt8View, limit) {
 }
 
 async function solvePuzzle(puzzle) {
-  let challenge = Uint8Array.from(atob(puzzle.challenge), (c) =>
-    c.charCodeAt(0)
-  );
+  let challenge = Uint8Array.from(atob(puzzle.challenge), (c) => c.charCodeAt(0));
   let buffer = new ArrayBuffer(20);
   let uInt8View = new Uint8Array(buffer);
   let uInt32View = new Uint32Array(buffer);
@@ -234,8 +225,7 @@ async function solvePuzzle(puzzle) {
 }
 
 function generateUserID(length = 36) {
-  const charset =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
   if (crypto && crypto.getRandomValues) {
     const values = new Uint32Array(length);
@@ -254,9 +244,7 @@ function generateUserID(length = 36) {
 
 function storageChangeHandler(changes, area) {
   if (changes.disableVoteSubmission !== undefined) {
-    handleDisableVoteSubmissionChangeEvent(
-      changes.disableVoteSubmission.newValue
-    );
+    handleDisableVoteSubmissionChangeEvent(changes.disableVoteSubmission.newValue);
   }
   if (changes.coloredThumbs !== undefined) {
     handleColoredThumbsChangeEvent(changes.coloredThumbs.newValue);
@@ -271,19 +259,16 @@ function storageChangeHandler(changes, area) {
     handleNumberDisplayFormatChangeEvent(changes.numberDisplayFormat.newValue);
   }
   if (changes.numberDisplayReformatLikes !== undefined) {
-    handleNumberDisplayReformatLikesChangeEvent(
-      changes.numberDisplayReformatLikes.newValue
-    );
+    handleNumberDisplayReformatLikesChangeEvent(changes.numberDisplayReformatLikes.newValue);
+  }
+  if (changes.disableLogging !== undefined) {
+    handleDisableLoggingChangeEvent(changes.disableLogging.newValue);
   }
   if (changes.showTooltipPercentage !== undefined) {
-    handleShowTooltipPercentageChangeEvent(
-      changes.showTooltipPercentage.newValue
-    );
+    handleShowTooltipPercentageChangeEvent(changes.showTooltipPercentage.newValue);
   }
   if (changes.numberDisplayReformatLikes !== undefined) {
-    handleNumberDisplayReformatLikesChangeEvent(
-      changes.numberDisplayReformatLikes.newValue
-    );
+    handleNumberDisplayReformatLikesChangeEvent(changes.numberDisplayReformatLikes.newValue);
   }
 }
 
@@ -296,6 +281,9 @@ function handleDisableVoteSubmissionChangeEvent(value) {
   }
 }
 
+function handleDisableLoggingChangeEvent(value) {
+  extConfig.disableLogging = value;
+}
 function handleNumberDisplayFormatChangeEvent(value) {
   extConfig.numberDisplayFormat = value;
 }
@@ -312,10 +300,8 @@ function handleTooltipPercentageModeChangeEvent(value) {
 }
 
 function changeIcon(iconName) {
-  if (api.action !== undefined)
-    api.action.setIcon({ path: "/icons/" + iconName });
-  else if (api.browserAction !== undefined)
-    api.browserAction.setIcon({ path: "/icons/" + iconName });
+  if (api.action !== undefined) api.action.setIcon({ path: "/icons/" + iconName });
+  else if (api.browserAction !== undefined) api.browserAction.setIcon({ path: "/icons/" + iconName });
   else console.log("changing icon is not supported");
 }
 
@@ -342,6 +328,7 @@ api.storage.onChanged.addListener(storageChangeHandler);
 
 function initExtConfig() {
   initializeDisableVoteSubmission();
+  initializeDisableLogging();
   initializeColoredThumbs();
   initializeColoredBar();
   initializeColorTheme();
@@ -362,6 +349,15 @@ function initializeDisableVoteSubmission() {
   });
 }
 
+function initializeDisableLogging() {
+  api.storage.sync.get(["disableLogging"], (res) => {
+    if (res.disableLogging === undefined) {
+      api.storage.sync.set({ disableLogging: true });
+    } else {
+      extConfig.disableLogging = res.disableLogging;
+    }
+  });
+}
 function initializeColoredThumbs() {
   api.storage.sync.get(["coloredThumbs"], (res) => {
     if (res.coloredThumbs === undefined) {
@@ -437,7 +433,5 @@ function isChrome() {
 }
 
 function isFirefox() {
-  return (
-    typeof browser !== "undefined" && typeof browser.runtime !== "undefined"
-  );
+  return typeof browser !== "undefined" && typeof browser.runtime !== "undefined";
 }
